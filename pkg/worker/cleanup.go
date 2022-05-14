@@ -10,8 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-
-	"github.com/nemoremold/perftests/pkg/constants"
 )
 
 func (w *Worker) cleanupDeployments(ctx context.Context) {
@@ -30,8 +28,8 @@ func (w *Worker) cleanupDeployments(ctx context.Context) {
 		deploymentList, err := w.Client.AppsV1().Deployments("default").List(ctx, metav1.ListOptions{
 			LabelSelector: metav1.FormatLabelSelector(&metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					constants.AppLabel:      constants.AppName,
-					constants.WorkerIDLabel: fmt.Sprint(w.ID),
+					AppLabel:      AppName,
+					WorkerIDLabel: fmt.Sprint(w.ID),
 				},
 			})})
 		if err == nil {
@@ -56,7 +54,7 @@ func (w *Worker) cleanupDeployments(ctx context.Context) {
 		default:
 			if err := w.Client.AppsV1().Deployments("default").Delete(ctx, deployment.Name, metav1.DeleteOptions{}); err != nil {
 				if !errors.IsNotFound(err) {
-					klog.Errorf("[worker %v] has failed deleting deployment %v", w.ID, deployment.Name)
+					klog.Errorf("[worker %v] has failed to delete deployment %v", w.ID, deployment.Name)
 				}
 			} else {
 				klog.V(4).Infof("[worker %v] has successfully deleted deployment %v", w.ID, deployment.Name)
@@ -83,8 +81,8 @@ func (w *Worker) cleanupPods(ctx context.Context) {
 		podList, err := w.Client.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
 			LabelSelector: metav1.FormatLabelSelector(&metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					constants.AppLabel:      constants.AppName,
-					constants.WorkerIDLabel: fmt.Sprint(w.ID),
+					AppLabel:      AppName,
+					WorkerIDLabel: fmt.Sprint(w.ID),
 				},
 			})})
 		if err == nil {
@@ -109,7 +107,7 @@ func (w *Worker) cleanupPods(ctx context.Context) {
 		default:
 			if err := w.Client.CoreV1().Pods("default").Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
 				if !errors.IsNotFound(err) {
-					klog.Errorf("[worker %v] has failed deleting deployment %v", w.ID, pod.Name)
+					klog.Errorf("[worker %v] has failed to delete deployment %v", w.ID, pod.Name)
 				}
 			} else {
 				klog.V(4).Infof("[worker %v] has successfully deleted pod %v", w.ID, pod.Name)

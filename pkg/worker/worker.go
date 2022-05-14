@@ -8,8 +8,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+
+	"github.com/nemoremold/perftests/pkg/metrics"
 )
 
+// Worker does actual performance testing and resource cleanup.
 type Worker struct {
 	// ID is the unique identity number for the worker.
 	ID int
@@ -40,17 +43,17 @@ func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
 }
 
 // Run starts the performance testing workflow of a worker.
-func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup) {
+func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, set metrics.MetricSetID) {
 	defer wg.Done()
 
 	klog.V(4).Infof("[worker %v] has started performance testing", w.ID)
 
-	w.testCreateDeployments(ctx, numberOfJobs)
-	w.testGetDeployments(ctx)
-	w.testUpdateDeployments(ctx)
-	w.testPatchDeployments(ctx)
-	w.testListDeployments(ctx)
-	w.testDeleteDeployments(ctx)
+	w.testCreateDeployments(ctx, numberOfJobs, set)
+	w.testGetDeployments(ctx, set)
+	w.testUpdateDeployments(ctx, set)
+	w.testPatchDeployments(ctx, set)
+	w.testListDeployments(ctx, set)
+	w.testDeleteDeployments(ctx, set)
 
 	klog.V(4).Infof("[worker %v] performance testing done!", w.ID)
 }

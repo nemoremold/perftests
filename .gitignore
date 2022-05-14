@@ -1,2 +1,5 @@
 .idea
-kubeconfig
+*kubeconfig
+*.csv
+configs
+exports
