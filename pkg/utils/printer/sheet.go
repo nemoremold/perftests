@@ -1,5 +1,10 @@
 package printer
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Sheet struct {
 	formatted bool
 	suggested bool
@@ -14,7 +19,7 @@ type Sheet struct {
 	footer []Line
 }
 
-func NewSheetPtr(want int, title Line) *Sheet {
+func NewSheet(want int, title Line) *Sheet {
 	return &Sheet{
 		formatted:      false,
 		suggested:      false,
@@ -110,8 +115,8 @@ func (s *Sheet) DetermineWidth() *Sheet {
 		}
 
 		if previous != s.width {
-			for _, table := range s.tables {
-				table.SetWantedWidth(s.width)
+			for index, table := range s.tables {
+				s.tables[index] = *table.SetWantedWidth(s.width)
 			}
 		}
 		s.formatted = true
@@ -123,33 +128,37 @@ func (s *Sheet) Print() {
 	s.DetermineWidth()
 
 	// Title section.
-	printDivider(s.width, '-')
+	printDivider(s.width)
 	s.printLines([]Line{s.title})
-	printDivider(s.width, '-')
+	printDivider(s.width)
 
 	// Header section.
 	if s.header != nil {
 		s.printLines(s.header)
-		printDivider(s.width, '-')
+		printDivider(s.width)
 	}
 
 	if s.footer != nil || s.tables != nil {
-		printDivider(s.width, '|')
+		printInBox('|', func() {
+			fmt.Print(strings.Repeat("|", s.width))
+		})
 	}
 
 	// Table sections.
 	for index, table := range s.tables {
 		table.Print()
 		if s.footer != nil || index < len(s.tables)-1 {
-			printDivider(s.width, '|')
+			printInBox('|', func() {
+				fmt.Print(strings.Repeat("|", s.width))
+			})
 		}
 	}
 
 	// Footer section.
 	if s.footer != nil {
-		printDivider(s.width, '-')
+		printDivider(s.width)
 		s.printLines(s.footer)
-		printDivider(s.width, '-')
+		printDivider(s.width)
 	}
 }
 

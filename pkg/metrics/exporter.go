@@ -57,8 +57,8 @@ func (e *exporter) Init() {
 	}
 
 	e.titles = make([]string, e.numberOfTables)
-	for _, percent := range e.percents {
-		e.titles = append(e.titles, percent+"% sample")
+	for index, percent := range e.percents {
+		e.titles[index] = percent + "% sample"
 	}
 
 	e.datum = make([]map[float64]rowData, e.numberOfTables)
@@ -127,11 +127,13 @@ func (e *exporter) Export(ctx context.Context, filepath string) error {
 		if err := writer.Write(e.header); err != nil {
 			return err
 		}
-		for quantile := range SummaryObjectives {
+
+		for _, quantile := range SortedQuantiles {
 			if err := writer.Write(e.datum[tableID][quantile]); err != nil {
 				return err
 			}
 		}
+
 		if err := writer.Write(e.datum[tableID][0]); err != nil {
 			return err
 		}

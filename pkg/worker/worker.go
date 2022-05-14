@@ -48,6 +48,7 @@ func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, 
 
 	klog.V(4).Infof("[worker %v] has started performance testing", w.ID)
 
+	w.Deployments = nil
 	w.testCreateDeployments(ctx, numberOfJobs, set)
 	w.testGetDeployments(ctx, set)
 	w.testUpdateDeployments(ctx, set)

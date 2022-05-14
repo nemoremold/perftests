@@ -15,14 +15,14 @@ const (
 
 type TableRow []Line
 
-func (r TableRow) Valid(t *Table) bool {
-	return len(r) == t.columnsCount
+func (r *TableRow) Valid(t *Table) bool {
+	return r.ColumnsCount() == t.columnsCount
 }
 
-func (r TableRow) Print(t *Table) {
+func (r *TableRow) Print(t *Table) {
 	if r.Valid(t) {
 		printInBox('|', func() {
-			for index, entry := range r {
+			for index, entry := range *r {
 				if index != 0 {
 					fmt.Print("|")
 				}
@@ -32,12 +32,12 @@ func (r TableRow) Print(t *Table) {
 	}
 }
 
-func (r TableRow) AddEntry(entry Line) TableRow {
-	return append(r, entry)
+func (r *TableRow) AddEntry(entry Line) {
+	*r = append(*r, entry)
 }
 
-func (r TableRow) ColumnsCount() int {
-	return len(r)
+func (r *TableRow) ColumnsCount() int {
+	return len(*r)
 }
 
 type Line struct {

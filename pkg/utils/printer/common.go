@@ -12,14 +12,14 @@ func PrintEmptyLine() {
 
 // printInBox prints content in surrounded by a symbol .
 func printInBox(symbol rune, print func()) {
-	fmt.Print(fmt.Sprint(symbol))
+	fmt.Printf("%c", symbol)
 	print()
-	fmt.Print(fmt.Sprint(symbol) + "\n")
+	fmt.Printf("%c\n", symbol)
 }
 
 // printDivider prints a divider with provided rune.
-func printDivider(width int, symbol rune) {
+func printDivider(width int) {
 	printInBox('+', func() {
-		fmt.Printf("%*v", width, strings.Repeat(fmt.Sprint(symbol), width))
+		fmt.Print(strings.Repeat("-", width))
 	})
 }

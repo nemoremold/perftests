@@ -12,16 +12,19 @@ import (
 )
 
 func parseFlags(opts *options.Options) {
+	pflag.IntVarP(&opts.ChaosAgentPollIntervalInSeconds, "chaos_agent_poll_interval", "", opts.ChaosAgentPollIntervalInSeconds, "interval in seconds between polls when waiting for IOChaos status change")
+	pflag.IntVarP(&opts.ChaosAgentPollTimeoutInSeconds, "chaos_agent_poll_timeout", "", opts.ChaosAgentPollTimeoutInSeconds, "timeout in seconds between polls when waiting for IOChaos status change")
+	pflag.StringVarP(&opts.ChaosAgentIOChaosTemplateFilePath, "chaos_agent_template", "", opts.ChaosAgentIOChaosTemplateFilePath, "path to the template IOChaos file")
 	pflag.StringVarP(&opts.ExportFolderPath, "export_folder_path", "f", opts.ExportFolderPath, "path to the folder where exported reports will be saved, only valid when '--write_to_csv' is true")
-	pflag.StringVarP(&opts.IOChaosKubeconfigFilePath, "io_chaos_kubeconfig", "c", opts.IOChaosKubeconfigFilePath, "path to the kubeconfig file used by chaos agent")
+	pflag.StringVarP(&opts.IOChaosKubeconfigFilePath, "chaos_agent_kubeconfig", "c", opts.IOChaosKubeconfigFilePath, "path to the kubeconfig file used by chaos agent")
 	pflag.IntVarP(&opts.JobsPerWorker, "jobs", "j", opts.JobsPerWorker, "number of jobs to be done per worker")
 	pflag.StringVarP(&opts.KubeconfigFilePath, "kubeconfig", "k", opts.KubeconfigFilePath, "path to the kubeconfig file")
-	pflag.StringArrayVarP(&opts.Latencies, "latencies", "l", opts.Latencies, "latencies to be applied to IOChaos for performance testing")
-	pflag.StringArrayVarP(&opts.PercentsStr, "percents", "p", opts.PercentsStr, "percents to be applied to IOChaos for performance testing")
+	pflag.StringSliceVarP(&opts.Latencies, "latencies", "l", opts.Latencies, "comma-separated latencies to be applied to IOChaos for performance testing")
+	pflag.StringSliceVarP(&opts.PercentsStr, "percents", "p", opts.PercentsStr, "comma-separated percents to be applied to IOChaos for performance testing")
 	pflag.IntVarP(&opts.SleepTimeInSeconds, "sleep", "s", opts.SleepTimeInSeconds, "waiting time in seconds after performance testing and before cleanup")
 	pflag.BoolVarP(&opts.Summarize, "summarize", "", opts.Summarize, "print the report of each test to stdout")
 	pflag.IntVarP(&opts.WorkerNumber, "workers", "w", opts.WorkerNumber, "number of workers")
-	pflag.BoolVarP(&opts.WriteToCSV, "write_to_csv", "", opts.WriteToCSV, "export the final testing report to a csv file")
+	pflag.BoolVarP(&opts.WriteToCSV, "export_to_csv", "", opts.WriteToCSV, "export the final testing report to a csv file")
 
 	fs := flag.NewFlagSet("klog", flag.ExitOnError)
 	klog.InitFlags(fs)
@@ -31,6 +34,7 @@ func parseFlags(opts *options.Options) {
 }
 
 // TODO: enhance logging with customized logger.
+// TODO: enhance error handling (resource cleanup), including fixing context and recover from panic (for cleanup).
 func main() {
 	// Parse flags and read configurations
 	opts := options.NewOptions()

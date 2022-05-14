@@ -17,23 +17,8 @@ type Table struct {
 	datum   []TableRow
 }
 
-func NewTablePtr(want, columnsCount int, title Line) *Table {
+func NewTable(want, columnsCount int, title Line) *Table {
 	return &Table{
-		formatted:      false,
-		suggested:      false,
-		wantedWidth:    want,
-		width:          0,
-		suggestedWidth: 0,
-		columnsCount:   columnsCount,
-		columnWidths:   nil,
-		title:          title,
-		indexes:        nil,
-		datum:          nil,
-	}
-}
-
-func NewTable(want, columnsCount int, title Line) Table {
-	return Table{
 		formatted:      false,
 		suggested:      false,
 		wantedWidth:    want,
@@ -143,11 +128,12 @@ func (t *Table) DetermineWidth() *Table {
 		}
 
 		if previous != t.width {
-			if t.suggestedWidth < t.width {
+			if t.suggestedWidth <= t.width {
 				margin := t.width - t.suggestedWidth
 				sharedIncrease := margin / t.columnsCount
 				bonusIncrease := margin % t.columnsCount
-				for index := range t.columnWidths {
+				t.columnWidths = make([]int, len(t.suggestedColumnWidths))
+				for index := range t.suggestedColumnWidths {
 					t.columnWidths[index] = t.suggestedColumnWidths[index] + sharedIncrease
 					if index+1 <= bonusIncrease {
 						t.columnWidths[index]++
@@ -164,16 +150,16 @@ func (t *Table) Print() {
 	t.DetermineWidth()
 
 	// Title section.
-	printDivider(t.width, '-')
+	printDivider(t.width)
 	printInBox('|', func() {
 		t.title.Print(t.width)
 	})
-	printDivider(t.width, '-')
+	printDivider(t.width)
 
 	// Index section.
 	if t.indexes != nil {
 		t.indexes.Print(t)
-		printDivider(t.width, '-')
+		printDivider(t.width)
 	}
 
 	// Datum section.
@@ -181,6 +167,6 @@ func (t *Table) Print() {
 		for _, row := range t.datum {
 			row.Print(t)
 		}
-		printDivider(t.width, '-')
+		printDivider(t.width)
 	}
 }

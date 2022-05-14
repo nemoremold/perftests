@@ -12,38 +12,21 @@ import (
 	"github.com/nemoremold/perftests/pkg/utils/printer"
 )
 
-// summarizer summarizes the performance testing result of a single test set (latency, percent),
-// generating the report and exporting it to a local file.
-type summarizer struct {
-	// set is the id of the metric set to be summarized.
-	set MetricSetID
-	// numberOfWorkers is the number of workers for the test.
-	numberOfWorkers int
-	// numberOfJobs is the number of jobs done per worker.
-	numberOfJobs int
-	// startTime is the time when the test starts.
-	startTime time.Time
-	// endTime is the time when the test finishes.
-	endTime time.Time
-}
-
-func (s *summarizer) PrintSummary() {
-
-}
-
 // Summary prints out the analyzed result of the performance testing.
 func Summary(set MetricSetID, numberOfWorkers, numberOfJobs int, start, end time.Time) {
 	// Prepare summary sheet.
-	sheet := printer.NewSheetPtr(0, printer.LineAlignCenter("Performance Testing Summary"))
+	sheet := printer.NewSheet(0, printer.LineAlignCenter("Performance Testing Summary"))
 
 	// Prepare sheet header.
 	aligner := 0
-	if numberOfWorkers < numberOfJobs {
-		aligner = len(fmt.Sprint(numberOfJobs))
-	} else {
-		aligner = len(fmt.Sprint(numberOfWorkers))
+	for _, candidate := range []int{len(fmt.Sprint(numberOfJobs)), len(fmt.Sprint(numberOfWorkers)), len(set.Latency), len(set.Percent)} {
+		if aligner < candidate {
+			aligner = candidate
+		}
 	}
 	sheet.SetHeader([]printer.Line{
+		printer.LineAlignRight("Latency: " + fmt.Sprintf("%*v", aligner, set.Latency)),
+		printer.LineAlignRight("Percent: " + fmt.Sprintf("%*v", aligner, set.Percent)),
 		printer.LineAlignRight("Total number of workers: " + fmt.Sprintf("%*v", aligner, numberOfWorkers)),
 		printer.LineAlignRight("Jobs done per worker: " + fmt.Sprintf("%*v", aligner, numberOfJobs)),
 	})
@@ -87,7 +70,7 @@ func prepareSuccessRateTable(set MetricSetID) printer.Table {
 	}
 	table.SetDatum(tableRows)
 
-	return table
+	return *table
 }
 
 func prepareSuccessRateTableRow(verb string, set MetricSetID) printer.TableRow {
@@ -111,7 +94,7 @@ func prepareLatencyTable(set MetricSetID) printer.Table {
 	indexRow := printer.TableRow{
 		printer.LineAlignRight("Verb"),
 	}
-	for quantile := range SummaryObjectives {
+	for _, quantile := range SortedQuantiles {
 		indexRow.AddEntry(printer.LineAlignRight("P" + fmt.Sprint(int(quantile*100))))
 	}
 	table := printer.NewTable(0, indexRow.ColumnsCount(), printer.LineAlignCenter("API Request Latency"))
@@ -126,7 +109,7 @@ func prepareLatencyTable(set MetricSetID) printer.Table {
 	}
 	table.SetDatum(tableRows)
 
-	return table
+	return *table
 }
 
 func prepareLatencyTableRow(verb string, set MetricSetID) printer.TableRow {
@@ -137,8 +120,13 @@ func prepareLatencyTableRow(verb string, set MetricSetID) printer.TableRow {
 	row := printer.TableRow{
 		printer.LineAlignRight(strings.ToUpper(verb)),
 	}
+
+	quantileMap := make(map[float64]float64)
 	for _, quantile := range metric.Summary.GetQuantile() {
-		row.AddEntry(printer.LineAlignRight(fmt.Sprintf("%.5f", *quantile.Value)))
+		quantileMap[*quantile.Quantile] = *quantile.Value
+	}
+	for _, quantile := range SortedQuantiles {
+		row.AddEntry(printer.LineAlignRight(fmt.Sprintf("%.5f", quantileMap[quantile])))
 	}
 	return row
 }

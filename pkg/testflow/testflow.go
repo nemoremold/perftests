@@ -51,6 +51,7 @@ func NewTestFlow(opts *options.Options) (*TestFlow, error) {
 	return &TestFlow{
 		Options: opts,
 		Agent:   agent,
+		Workers: workers,
 	}, nil
 }
 
@@ -68,7 +69,7 @@ func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 
 	if flow.WriteToCSV {
 		// Export the report to a CSV file.
-		metrics.WriteToCSV(flow.Options, startTime)
+		metrics.WriteToCSV(ctx, flow.Options, startTime)
 	}
 
 	return nil
@@ -77,7 +78,7 @@ func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 // startTestFlowWithIOChaos prepares the IOChaos before running the actual tests and deletes
 // it after the test has finished.
 func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, latency string, percent int) (err error) {
-	klog.V(4).Infof("starting tests with IOChaos (latency: %v, percent: %v)", latency, percent)
+	klog.V(2).Infof("starting tests with IOChaos (latency: %v, percent: %v)", latency, percent)
 
 	// Prepare new IOChaos.
 	ioChaos := flow.Agent.NewIOChaos(latency, percent)
@@ -99,7 +100,7 @@ func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, latency stri
 		Latency: latency,
 		Percent: fmt.Sprint(percent),
 	}); err == nil {
-		klog.V(4).Infof("successfully finished testing with IOChaos (latency: %v, percent: %v)", latency, percent)
+		klog.V(2).Infof("successfully finished testing with IOChaos (latency: %v, percent: %v)", latency, percent)
 	}
 	return
 }

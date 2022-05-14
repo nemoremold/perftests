@@ -51,6 +51,9 @@ func NewChaosAgent(kubeconfig string, templateFilePath string, interval, timeout
 	if err != nil {
 		return nil, err
 	}
+	if err := v1alpha1.AddToScheme(c.Scheme()); err != nil {
+		return nil, err
+	}
 
 	// TODO: read template configuration from file.
 	template := &v1alpha1.IOChaos{

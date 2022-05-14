@@ -1,6 +1,10 @@
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"sort"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 var (
 	// SummaryObjectives defines the quantiles and their respective
@@ -14,6 +18,8 @@ var (
 		0.95: 0.005,
 		0.99: 0.001,
 	}
+
+	SortedQuantiles []float64
 
 	registry *prometheus.Registry
 
@@ -49,6 +55,12 @@ func init() {
 	registry.MustRegister(totalAPIRequests)
 	registry.MustRegister(successfulAPIRequests)
 	registry.MustRegister(apiRequestLatencies)
+
+	SortedQuantiles = make([]float64, 0)
+	for quantile := range SummaryObjectives {
+		SortedQuantiles = append(SortedQuantiles, quantile)
+	}
+	sort.Float64s(SortedQuantiles)
 }
 
 // MetricSetID groups the metrics by latency label and percent label.
