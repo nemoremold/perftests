@@ -14,6 +14,7 @@ import (
 
 // Worker does actual performance testing and resource cleanup.
 type Worker struct {
+	// TODO: make this actual unique, lol, e.g. via using a factory.
 	// ID is the unique identity number for the worker.
 	ID int
 

@@ -8,17 +8,15 @@ import (
 	"strings"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
 
 	"github.com/nemoremold/perftests/pkg/constants"
 	"github.com/nemoremold/perftests/pkg/options"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-// exporter summarizes the final and overall performance testing result, generating
+// Exporter summarizes the final and overall performance testing result, generating
 // the report and exporting it to a local file.
-type exporter struct {
+type Exporter struct {
 	// latencies are latency labels.
 	latencies []string
 	// percents are percent labels.
@@ -43,12 +41,23 @@ type exporter struct {
 // Each item is an entry in the table.
 type rowData []string
 
-// Init initializes the exporter, preparing metrics table.
-func (e *exporter) Init() {
+// NewExporter instantiates a new exporter instance.
+func NewExporter(latencies, percents []string) *Exporter {
+	e := &Exporter{
+		latencies: latencies,
+		percents:  percents,
+	}
+	e.init()
+	return e
+}
+
+// init initializes the Exporter, preparing metrics table.
+func (e *Exporter) init() {
 	e.numberOfTables = len(e.percents)
 	e.numberOfColumns = len(e.latencies) + 1
 	e.numberOfDataRowsPerTable = len(SummaryObjectives) + 1
 
+	// Set table headers.
 	e.header = make(rowData, e.numberOfColumns)
 	e.header[0] = "Quantile"
 	for index, latency := range e.latencies {
@@ -56,11 +65,13 @@ func (e *exporter) Init() {
 		e.header[index+1] = fmt.Sprintf("Latency(%v)", latency)
 	}
 
+	// Set title for each table.
 	e.titles = make([]string, e.numberOfTables)
 	for index, percent := range e.percents {
 		e.titles[index] = percent + "% sample"
 	}
 
+	// Set table indexes.
 	e.datum = make([]map[float64]rowData, e.numberOfTables)
 	for index := range e.datum {
 		e.datum[index] = make(map[float64]rowData)
@@ -73,40 +84,28 @@ func (e *exporter) Init() {
 	}
 }
 
-// Summarize summarizes the overall latency metrics and success rate metrics.
-func (e *exporter) Summarize() error {
-	for tableID, percent := range e.percents {
-		if err := e.summarize(tableID, percent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+// WriteToCSV gathers the all-time metrics and summarizes them into an overall report,
+// exporting it to the target folder.
+func (e *Exporter) WriteToCSV(ctx context.Context, opts *options.Options, startTime time.Time) {
+	// Determine export file path.
+	// File name format: <formatted_test_start_date_time>_<number_of_workers>_<number_of_jobs_per_worker>.csv
+	datetime := fmt.Sprint(startTime.Local())
+	datetime = strings.ReplaceAll(datetime, ":", "-")
+	datetime = strings.ReplaceAll(datetime, " ", "_")
+	datetime = strings.ReplaceAll(datetime, "+", "")
+	filepath := opts.ExportFolderPath + "/" + datetime + "_" + fmt.Sprint(opts.WorkerNumber) + "_" + fmt.Sprint(opts.JobsPerWorker) + ".csv"
 
-// summarize summarizes the overall latency metrics and success rate metrics for a
-// certain percent label in the registry.
-func (e *exporter) summarize(tableID int, percent string) error {
-	for index, latency := range e.latencies {
-		latencyMetric, err := summarizeLatencyMetric(latency, percent)
-		if err != nil {
-			return err
-		}
-		for _, quantile := range latencyMetric.Summary.Quantile {
-			quantileMark := *quantile.Quantile
-			e.datum[tableID][quantileMark][index+1] = fmt.Sprintf("%.10f", *quantile.Value)
-		}
-
-		successRate, err := summarizeSuccessRate(latency, percent)
-		if err != nil {
-			return err
-		}
-		e.datum[tableID][0][index+1] = fmt.Sprintf("%.2f", successRate) + "%"
+	// Prepare file to export report to.
+	klog.V(2).Infof("writing final performance testing report to %v", filepath)
+	if err := e.Export(ctx, filepath); err != nil {
+		klog.Errorf("failed to export to file %v: %v", filepath, err.Error())
+		return
 	}
-	return nil
+	klog.V(2).Infof("successfully wrote final performance testing report to %v", filepath)
 }
 
 // Export exports the report to a file.
-func (e *exporter) Export(ctx context.Context, filepath string) error {
+func (e *Exporter) Export(ctx context.Context, filepath string) error {
 	file, err := os.Create(filepath)
 	if err != nil {
 		return err
@@ -143,61 +142,27 @@ func (e *exporter) Export(ctx context.Context, filepath string) error {
 	return nil
 }
 
-// summarizeLatencyMetric gets the overall API request latencies for a metric set.
-func summarizeLatencyMetric(latency, percent string) (*dto.Metric, error) {
-	metric := &dto.Metric{}
-	summary := apiRequestLatencies.WithLabelValues(constants.ALL, latency, percent).(prometheus.Summary)
-	if err := summary.Write(metric); err != nil {
-		return nil, err
+// Collect collects latency quantiles and success rate for a certain
+// latency-percent pair.
+func (e *Exporter) Collect(percentIndex, latencyIndex int) error {
+	set := MetricSetID{
+		Latency: e.latencies[latencyIndex],
+		Percent: e.percents[percentIndex],
 	}
-	return metric, nil
-}
 
-// summarizeSuccessRate gets the overall API request success rate for a metric set.
-func summarizeSuccessRate(latency, percent string) (float64, error) {
-	metric := &dto.Metric{}
-	if err := totalAPIRequests.WithLabelValues(constants.ALL, latency, percent).Write(metric); err != nil {
-		return 0, err
+	latencyMetric, err := collectLatencyMetric(constants.ALL, set)
+	if err != nil {
+		return err
 	}
-	allGets := metric.Counter.GetValue()
-	if err := successfulAPIRequests.WithLabelValues(constants.ALL, latency, percent).Write(metric); err != nil {
-		return 0, err
+	for _, quantile := range latencyMetric.Summary.Quantile {
+		e.datum[percentIndex][*quantile.Quantile][latencyIndex+1] = fmt.Sprintf("%.10f", *quantile.Value)
 	}
-	allSuccessfulGets := metric.Counter.GetValue()
-	return allSuccessfulGets * 100 / allGets, nil
-}
 
-// WriteToCSV gathers the all-time metrics and summarizes them into an overall report,
-// exporting it to the target folder.
-func WriteToCSV(ctx context.Context, opts *options.Options, startTime time.Time) {
-	// Create an exporter instance and initialize it.
-	e := &exporter{
-		latencies: opts.Latencies,
-		percents:  opts.PercentsStr,
+	_, _, successRate, err := collectSuccessRateMetrics(constants.ALL, set)
+	if err != nil {
+		return err
 	}
-	e.Init()
+	e.datum[percentIndex][0][latencyIndex+1] = fmt.Sprintf("%.2f", successRate) + "%"
 
-	// Generate the all-time final report.
-	klog.V(4).Info("generating final performance testing report")
-	if err := e.Summarize(); err != nil {
-		klog.Errorf("failed to generate final report: %v", err.Error())
-		return
-	}
-	klog.V(4).Info("successfully generated final performance testing report")
-
-	// Determine export file path.
-	// File name format: <formatted_test_start_date_time>_<number_of_workers>_<number_of_jobs_per_worker>.csv
-	datetime := fmt.Sprint(startTime.Local())
-	datetime = strings.ReplaceAll(datetime, ":", "-")
-	datetime = strings.ReplaceAll(datetime, " ", "_")
-	datetime = strings.ReplaceAll(datetime, "+", "")
-	filepath := opts.ExportFolderPath + "/" + datetime + "_" + fmt.Sprint(opts.WorkerNumber) + "_" + fmt.Sprint(opts.JobsPerWorker) + ".csv"
-
-	// Prepare file to export report to.
-	klog.V(2).Infof("writing final performance testing report to %v", filepath)
-	if err := e.Export(ctx, filepath); err != nil {
-		klog.Errorf("failed to export to file %v: %v", filepath, err.Error())
-		return
-	}
-	klog.V(2).Infof("successfully wrote final performance testing report to %v", filepath)
+	return nil
 }

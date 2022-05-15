@@ -5,20 +5,35 @@ import (
 	"strings"
 )
 
+// Sheet is an output format where there is a title, followed by a header section,
+// followed by a table sections with a number of tables, followed by a footer section.
 type Sheet struct {
+	// formatted is `true` when the sheet has been formatted (and therefore is able
+	// to be printed).
 	formatted bool
+	// suggested is `true` when the sheet has proposed the minimal width it needs to
+	// have. A suggested width must exist before formatting the sheet.
 	suggested bool
 
-	wantedWidth    int
-	width          int
+	// wantedWidth is the width of the sheet if it is greater than `suggestedWidth`.
+	wantedWidth int
+	// width is the actual width of the sheet.
+	width int
+	// suggestedWidth is calculated with the widths of all elements in the sheet.
+	// It is the width of the sheet if it is greater than `wantedWidth`.
 	suggestedWidth int
 
-	title  Line
+	// title is a single line string.
+	title Line
+	// header is a section with several lines of strings.
 	header []Line
+	// tables is a section with several tables.
 	tables []Table
+	// footer is a section with several lines of strings.
 	footer []Line
 }
 
+// NewSheet instantiates a new sheet instance.
 func NewSheet(want int, title Line) *Sheet {
 	return &Sheet{
 		formatted:      false,
@@ -33,24 +48,31 @@ func NewSheet(want int, title Line) *Sheet {
 	}
 }
 
+// WantedWidth returns the current wanted width of the sheet.
 func (s *Sheet) WantedWidth() int {
 	return s.wantedWidth
 }
 
+// Width returns the current width of the sheet.
 func (s *Sheet) Width() int {
 	return s.width
 }
 
+// SuggestedWidth returns the current suggested width of the sheet.
 func (s *Sheet) SuggestedWidth() int {
 	return s.suggestedWidth
 }
 
+// SetWantedWidth sets the `wantedWidth` of the sheet, marking the sheet
+// as un-formatted.
 func (s *Sheet) SetWantedWidth(want int) *Sheet {
 	s.wantedWidth = want
 	s.formatted = false
 	return s
 }
 
+// SetTitle sets the title section of the sheet, marking the sheet
+// as un-formatted and un-suggested (sheet element changed).
 func (s *Sheet) SetTitle(title Line) *Sheet {
 	s.title = title
 	s.formatted = false
@@ -58,6 +80,8 @@ func (s *Sheet) SetTitle(title Line) *Sheet {
 	return s
 }
 
+// SetTitle sets the header section of the sheet, marking the sheet
+// as un-formatted and un-suggested (sheet element changed).
 func (s *Sheet) SetHeader(header []Line) *Sheet {
 	s.header = header
 	s.formatted = false
@@ -65,6 +89,8 @@ func (s *Sheet) SetHeader(header []Line) *Sheet {
 	return s
 }
 
+// SetTitle sets the table section of the sheet, marking the sheet
+// as un-formatted and un-suggested (sheet element changed).
 func (s *Sheet) SetTables(tables []Table) *Sheet {
 	s.tables = tables
 	s.formatted = false
@@ -72,6 +98,8 @@ func (s *Sheet) SetTables(tables []Table) *Sheet {
 	return s
 }
 
+// SetTitle sets the footer section of the sheet, marking the sheet
+// as un-formatted and un-suggested (sheet element changed).
 func (s *Sheet) SetFooter(footer []Line) *Sheet {
 	s.footer = footer
 	s.formatted = false
@@ -79,6 +107,8 @@ func (s *Sheet) SetFooter(footer []Line) *Sheet {
 	return s
 }
 
+// SuggestWidth calculates all elements' suggested widths and proposes a
+// minimal width for the sheet.
 func (s *Sheet) SuggestWidth() *Sheet {
 	if !s.suggested {
 		for _, table := range s.tables {
@@ -101,6 +131,9 @@ func (s *Sheet) SuggestWidth() *Sheet {
 	return s
 }
 
+// DetermineWidth compares the suggested width and the wanted width, determining
+// the width of the sheet. If the width of the sheet has changed, the sheet will
+// enforce the new width on all of its components.
 func (s *Sheet) DetermineWidth() *Sheet {
 	if !s.formatted {
 		if !s.suggested {
@@ -124,6 +157,7 @@ func (s *Sheet) DetermineWidth() *Sheet {
 	return s
 }
 
+// Print prints the sheet.
 func (s *Sheet) Print() {
 	s.DetermineWidth()
 
@@ -162,6 +196,7 @@ func (s *Sheet) Print() {
 	}
 }
 
+// printLines prints a line of the sheet with surrounded `|`.
 func (s *Sheet) printLines(lines []Line) {
 	for _, line := range lines {
 		printInBox('|', func() {

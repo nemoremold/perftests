@@ -9,6 +9,7 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+// patchValue is used to do JSONPatch to K8s resources.
 type patchValue struct {
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
@@ -74,12 +75,12 @@ func init() {
 }
 
 const (
-	// WorkerIDLabel is the label used on deployments and pods
+	// WorkerIDLabel is the label used on deployments and pods.
 	WorkerIDLabel = "workerId"
-	// AppLabel is the label specifying the name of the app
+	// AppLabel is the label specifying the name of the app.
 	AppLabel = "app"
-	// AppName is the name of the app
+	// AppName is the name of the app.
 	AppName = "nginx"
-	// AppImage is the image of the app
+	// AppImage is the image of the app.
 	AppImage = "nginx:1.14.2"
 )

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 )
 
 // Options is the configuration of the perftests program.
@@ -75,14 +77,34 @@ func (o *Options) Parse() error {
 		o.Percents = append(o.Percents, percent)
 	}
 
+	// Sort the percents by ascending order.
+	sort.Ints(o.Percents)
+	for index, percent := range o.Percents {
+		o.PercentsStr[index] = fmt.Sprint(percent)
+	}
+
 	// Ensure latencies are valid values.
 	// Valid: 0ms, 1ms, 10ms...
 	// Invalid: '01ms', '1 ms', ' 20ms', '9ms '...
+	var latencies []int
 	r, _ := regexp.Compile("^(0ms|[1-9]([0-9]*)ms)$")
 	for _, latency := range o.Latencies {
 		if !r.MatchString(latency) {
 			return fmt.Errorf("%v is not a valid latency (valid format regex: ^(0ms|[1-9]([0-9]*)ms)$)", latency)
 		}
+
+		latencyStr := strings.Replace(latency, "ms", "", 1)
+		latencyInt, err := strconv.Atoi(latencyStr)
+		if err != nil {
+			return err
+		}
+		latencies = append(latencies, latencyInt)
+	}
+
+	// Sort the latencies by ascending order.
+	sort.Ints(latencies)
+	for index, latencyInt := range latencies {
+		o.Latencies[index] = fmt.Sprint(latencyInt) + "ms"
 	}
 
 	// Ensure `ExportFolderPath` is a folder.

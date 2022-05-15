@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"sort"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -19,6 +20,7 @@ var (
 		0.99: 0.001,
 	}
 
+	// SortedQuantiles is the sorted array of summary objectives.
 	SortedQuantiles []float64
 
 	registry *prometheus.Registry
@@ -44,6 +46,7 @@ var (
 			Name:       "api_request_latencies",
 			Help:       "The latency of API requests sent from workers to kube-apiserver during performance testing",
 			Objectives: SummaryObjectives,
+			MaxAge:     60 * time.Minute, // Set a longer MaxAge because some test cases may take longer to finish.
 		},
 		[]string{"verb", "latency", "percent"},
 	)

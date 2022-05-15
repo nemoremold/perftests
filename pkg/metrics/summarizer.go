@@ -5,9 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
-
 	"github.com/nemoremold/perftests/pkg/constants"
 	"github.com/nemoremold/perftests/pkg/utils/printer"
 )
@@ -50,6 +47,7 @@ func Summary(set MetricSetID, numberOfWorkers, numberOfJobs int, start, end time
 	printer.PrintEmptyLine()
 }
 
+// prepareSuccessRateTable generates the success rate table.
 func prepareSuccessRateTable(set MetricSetID) printer.Table {
 	// Prepare API request success rate table.
 	indexRow := printer.TableRow{
@@ -61,7 +59,7 @@ func prepareSuccessRateTable(set MetricSetID) printer.Table {
 	table := printer.NewTable(0, indexRow.ColumnsCount(), printer.LineAlignCenter("API Request Success Rate"))
 
 	// Prepare indexes.
-	table.SetIndexes(indexRow)
+	table.SetHeaders(indexRow)
 
 	// Prepare values.
 	var tableRows []printer.TableRow
@@ -73,34 +71,34 @@ func prepareSuccessRateTable(set MetricSetID) printer.Table {
 	return *table
 }
 
+// prepareSuccessRateTableRow collects success rate related metrics from a specific
+// metric set and insert its values to a table row.
 func prepareSuccessRateTableRow(verb string, set MetricSetID) printer.TableRow {
-	metric := &dto.Metric{}
-	_ = totalAPIRequests.WithLabelValues(verb, set.Latency, set.Percent).Write(metric)
-	allGets := metric.Counter.GetValue()
-	_ = successfulAPIRequests.WithLabelValues(verb, set.Latency, set.Percent).Write(metric)
-	allSuccessfulGets := metric.Counter.GetValue()
-	percentage := allSuccessfulGets * 100 / allGets
+	allGets, allSuccessfulGets, percentage, _ := collectSuccessRateMetrics(verb, set)
 
 	return printer.TableRow{
+		// Row index.
 		printer.LineAlignRight(strings.ToUpper(verb)),
+		// Row values.
 		printer.LineAlignRight(fmt.Sprint(allGets)),
 		printer.LineAlignRight(fmt.Sprint(allSuccessfulGets)),
 		printer.LineAlignRight(fmt.Sprintf("%.2f", percentage)),
 	}
 }
 
+// prepareLatencyTable generates the latency table.
 func prepareLatencyTable(set MetricSetID) printer.Table {
 	// Prepare API request latency table.
-	indexRow := printer.TableRow{
+	headerRow := printer.TableRow{
 		printer.LineAlignRight("Verb"),
 	}
 	for _, quantile := range SortedQuantiles {
-		indexRow.AddEntry(printer.LineAlignRight("P" + fmt.Sprint(int(quantile*100))))
+		headerRow.AddEntry(printer.LineAlignRight("P" + fmt.Sprint(int(quantile*100))))
 	}
-	table := printer.NewTable(0, indexRow.ColumnsCount(), printer.LineAlignCenter("API Request Latency"))
+	table := printer.NewTable(0, headerRow.ColumnsCount(), printer.LineAlignCenter("API Request Latency"))
 
 	// Prepare indexes.
-	table.SetIndexes(indexRow)
+	table.SetHeaders(headerRow)
 
 	// Prepare values.
 	var tableRows []printer.TableRow
@@ -112,19 +110,20 @@ func prepareLatencyTable(set MetricSetID) printer.Table {
 	return *table
 }
 
+// prepareLatencyTableRow collects latency metrics from a specific metric set and
+// insert its values to a table row.
 func prepareLatencyTableRow(verb string, set MetricSetID) printer.TableRow {
-	metric := &dto.Metric{}
-	summary := apiRequestLatencies.WithLabelValues(verb, set.Latency, set.Percent).(prometheus.Summary)
-	_ = summary.Write(metric)
-
-	row := printer.TableRow{
-		printer.LineAlignRight(strings.ToUpper(verb)),
-	}
-
+	metric, _ := collectLatencyMetric(verb, set)
 	quantileMap := make(map[float64]float64)
 	for _, quantile := range metric.Summary.GetQuantile() {
 		quantileMap[*quantile.Quantile] = *quantile.Value
 	}
+
+	// Set row index.
+	row := printer.TableRow{
+		printer.LineAlignRight(strings.ToUpper(verb)),
+	}
+	// Set row values.
 	for _, quantile := range SortedQuantiles {
 		row.AddEntry(printer.LineAlignRight(fmt.Sprintf("%.5f", quantileMap[quantile])))
 	}

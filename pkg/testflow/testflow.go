@@ -23,6 +23,10 @@ type TestFlow struct {
 
 	// Workers do actual performance testing and resource cleanup.
 	Workers []*worker.Worker
+
+	// Exporter collects metrics data and generates the final report,
+	// exporting it to a CSV file.
+	Exporter *metrics.Exporter
 }
 
 // NewTestFlow instantiates a new performance testing test flow.
@@ -48,10 +52,17 @@ func NewTestFlow(opts *options.Options) (*TestFlow, error) {
 		workers = append(workers, w)
 	}
 
+	// Initialize report exporter.
+	var exporter *metrics.Exporter
+	if opts.WriteToCSV {
+		exporter = metrics.NewExporter(opts.Latencies, opts.PercentsStr)
+	}
+
 	return &TestFlow{
-		Options: opts,
-		Agent:   agent,
-		Workers: workers,
+		Options:  opts,
+		Agent:    agent,
+		Workers:  workers,
+		Exporter: exporter,
 	}, nil
 }
 
@@ -59,17 +70,18 @@ func NewTestFlow(opts *options.Options) (*TestFlow, error) {
 // to the IOChaos, and runs the test flow with every (latency, percent) pair setting.
 func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 	startTime := time.Now()
-	for _, percent := range flow.Percents {
-		for _, latency := range flow.Latencies {
-			if err := flow.startTestFlowWithIOChaos(ctx, latency, percent); err != nil {
+	for percentIndex := range flow.Percents {
+		for latencyIndex := range flow.Latencies {
+			if err := flow.startTestFlowWithIOChaos(ctx, percentIndex, latencyIndex); err != nil {
 				return err
 			}
 		}
 	}
 
+	// Export the final report to a CSV file.
 	if flow.WriteToCSV {
 		// Export the report to a CSV file.
-		metrics.WriteToCSV(ctx, flow.Options, startTime)
+		flow.Exporter.WriteToCSV(ctx, flow.Options, startTime)
 	}
 
 	return nil
@@ -77,11 +89,11 @@ func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 
 // startTestFlowWithIOChaos prepares the IOChaos before running the actual tests and deletes
 // it after the test has finished.
-func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, latency string, percent int) (err error) {
-	klog.V(2).Infof("starting tests with IOChaos (latency: %v, percent: %v)", latency, percent)
+func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, percentIndex, latencyIndex int) (err error) {
+	klog.V(2).Infof("starting tests with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
 
 	// Prepare new IOChaos.
-	ioChaos := flow.Agent.NewIOChaos(latency, percent)
+	ioChaos := flow.Agent.NewIOChaos(flow.Latencies[latencyIndex], flow.Percents[percentIndex])
 
 	// Ensure IOChaos is deleted after each test.
 	defer func() {
@@ -96,18 +108,20 @@ func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, latency stri
 	}
 
 	// Run the actual test flow.
-	if err = flow.startTestFlow(ctx, metrics.MetricSetID{
-		Latency: latency,
-		Percent: fmt.Sprint(percent),
-	}); err == nil {
-		klog.V(2).Infof("successfully finished testing with IOChaos (latency: %v, percent: %v)", latency, percent)
+	if err = flow.startTestFlow(ctx, percentIndex, latencyIndex); err == nil {
+		klog.V(2).Infof("successfully finished testing with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
 	}
 	return
 }
 
 // startTestFlow does the actual performance testing, cleaning up the test environment before and
 // after the tests.
-func (flow *TestFlow) startTestFlow(ctx context.Context, set metrics.MetricSetID) error {
+func (flow *TestFlow) startTestFlow(ctx context.Context, percentIndex, latencyIndex int) error {
+	set := metrics.MetricSetID{
+		Latency: flow.Latencies[latencyIndex],
+		Percent: flow.PercentsStr[percentIndex],
+	}
+
 	// TODO: current design of context and cancel channel is not correct, fix it!
 	// Prepare context dedicated for performance testing. When stop signal
 	// is received, this dedicated context will be cancelled first, triggering
@@ -128,9 +142,17 @@ func (flow *TestFlow) startTestFlow(ctx context.Context, set metrics.MetricSetID
 	flow.performanceTest(jobsCtx, set)
 	endTime := time.Now()
 
+	// Print summary for a single test.
 	if flow.Summarize {
 		// Print the report in stdout.
 		metrics.Summary(set, flow.WorkerNumber, flow.JobsPerWorker, startTime, endTime)
+	}
+	// Collect metrics for final report right after a test has finished to avoid
+	// the metrics from expiring (Prometheus Summary metrics has MaxAge).
+	if flow.WriteToCSV {
+		if err := flow.Exporter.Collect(percentIndex, latencyIndex); err != nil {
+			klog.Errorf("failed to collect metrics for testing with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
+		}
 	}
 
 	// Wait some time before proceeding with cleanup, because the deletions triggered by
