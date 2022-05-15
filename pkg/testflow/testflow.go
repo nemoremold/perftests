@@ -69,6 +69,7 @@ func NewTestFlow(opts *options.Options) (*TestFlow, error) {
 // RunTestFlow iterates the pre-defined range of percents and latencies to be applied
 // to the IOChaos, and runs the test flow with every (latency, percent) pair setting.
 func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
+	klog.V(2).Info("starting test flow")
 	startTime := time.Now()
 	for percentIndex := range flow.Percents {
 		for latencyIndex := range flow.Latencies {
@@ -77,20 +78,31 @@ func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 			}
 		}
 	}
+	endTime := time.Now()
+	klog.V(2).Info("successfully finished test flow")
+	klog.V(2).Infof("test flow started at %v", startTime.Local())
+	klog.V(2).Infof("test flow finished at %v", endTime.Local())
+	klog.V(2).Infof("test flow duration: %v", endTime.Sub(startTime).String())
 
 	// Export the final report to a CSV file.
 	if flow.WriteToCSV {
 		// Export the report to a CSV file.
 		flow.Exporter.WriteToCSV(ctx, flow.Options, startTime)
 	}
-
 	return nil
 }
 
 // startTestFlowWithIOChaos prepares the IOChaos before running the actual tests and deletes
 // it after the test has finished.
 func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, percentIndex, latencyIndex int) (err error) {
-	klog.V(2).Infof("starting tests with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
+	totalTests := len(flow.Latencies) * len(flow.Percents)
+	currentTest := percentIndex*len(flow.Latencies) + latencyIndex + 1
+	klog.V(2).Infof("starting tests (%v/%v) with IOChaos (latency: %v, percent: %v)",
+		currentTest,
+		totalTests,
+		flow.Latencies[latencyIndex],
+		flow.Percents[percentIndex],
+	)
 
 	// Prepare new IOChaos.
 	ioChaos := flow.Agent.NewIOChaos(flow.Latencies[latencyIndex], flow.Percents[percentIndex])
@@ -109,7 +121,7 @@ func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, percentIndex
 
 	// Run the actual test flow.
 	if err = flow.startTestFlow(ctx, percentIndex, latencyIndex); err == nil {
-		klog.V(2).Infof("successfully finished testing with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
+		klog.V(2).Infof("successfully finished tests with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
 	}
 	return
 }

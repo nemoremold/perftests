@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: io-latency
+  namespace: some-ns
+spec:
+  action: latency
+  mode: one
+  selector:
+    nodes:
+      - some.specific.node.name
+    labelSelectors:
+      app: etcd-statefulset
+  volumePath: /var/etcd/data # inject chaos for Etcd!
+  path: '/var/etcd/data/**/*' # inject chaos for Etcd!
+  delay: '0ms'
+  percent: 0
+  duration: '40h'

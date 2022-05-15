@@ -2,5 +2,6 @@
 .DS_Store
 *kubeconfig
 *.csv
-configs
-exports
+/configs/*
+!/configs/*-example*
+/exports/
