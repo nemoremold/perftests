@@ -107,6 +107,21 @@ func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, percentIndex
 	// Prepare new IOChaos.
 	ioChaos := flow.Agent.NewIOChaos(flow.Latencies[latencyIndex], flow.Percents[percentIndex])
 
+	// TODO: cleanup tasks currently return no error info, so this process might still fail, causing the test to run in an unclean environment.
+	// ALWAYS DO CLEANUP WITHOUT IOCHAOS! - RUN CLEANUP FIRST!
+	// Ensure the environment is clean before testing.
+	klog.V(4).Info("cleaning up testing environment before performance testing")
+	flow.cleanup(ctx, nil)
+
+	// TODO: current design of context and cancel channel is not correct, fix it!
+	// ALWAYS DO CLEANUP WITHOUT IOCHAOS! - DEFER CLEANUP FIRST!
+	// Prepare context dedicated for performance testing. When stop signal
+	// is received, this dedicated context will be cancelled first, triggering
+	// the clean up process before actually stopping the program.
+	jobsCtx, jobsCancel := context.WithCancel(ctx)
+	// Clean up workflow leverages global context.
+	defer flow.cleanup(ctx, jobsCancel)
+
 	// Ensure IOChaos is deleted after each test.
 	defer func() {
 		if deleteErr := flow.Agent.Delete(ctx, ioChaos); deleteErr != nil {
@@ -120,7 +135,7 @@ func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, percentIndex
 	}
 
 	// Run the actual test flow.
-	if err = flow.startTestFlow(ctx, percentIndex, latencyIndex); err == nil {
+	if err = flow.startTestFlow(jobsCtx, percentIndex, latencyIndex); err == nil {
 		klog.V(2).Infof("successfully finished tests with IOChaos (latency: %v, percent: %v)", flow.Latencies[latencyIndex], flow.Percents[percentIndex])
 	}
 	return
@@ -134,24 +149,10 @@ func (flow *TestFlow) startTestFlow(ctx context.Context, percentIndex, latencyIn
 		Percent: flow.PercentsStr[percentIndex],
 	}
 
-	// TODO: current design of context and cancel channel is not correct, fix it!
-	// Prepare context dedicated for performance testing. When stop signal
-	// is received, this dedicated context will be cancelled first, triggering
-	// the clean up process before actually stopping the program.
-	jobsCtx, jobsCancel := context.WithCancel(ctx)
-	// Clean up workflow leverages global context.
-	defer flow.cleanup(ctx, jobsCancel)
-
-	// TODO: cleanup tasks currently return no error info, so this process might still fail, causing the test to run in an unclean environment.
-	// Ensure the environment is clean before testing.
-	klog.V(4).Info("cleaning up testing environment before performance testing")
-	flow.cleanup(ctx, nil)
-
 	// Performance testing workflow leverages dedicated context.
-
 	klog.V(4).Info("starting up testing environment before performance testing")
 	startTime := time.Now()
-	flow.performanceTest(jobsCtx, set)
+	flow.performanceTest(ctx, set)
 	endTime := time.Now()
 
 	// Print summary for a single test.
