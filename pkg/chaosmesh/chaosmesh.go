@@ -3,17 +3,17 @@ package chaosmesh
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"time"
 
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/nemoremold/perftests/pkg/utils"
@@ -55,35 +55,10 @@ func NewChaosAgent(kubeconfig string, templateFilePath string, interval, timeout
 		return nil, err
 	}
 
-	// TODO: read template configuration from file.
-	template := &v1alpha1.IOChaos{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "io-latency",
-			Namespace: "etcd",
-		},
-		Spec: v1alpha1.IOChaosSpec{
-			ContainerSelector: v1alpha1.ContainerSelector{
-				PodSelector: v1alpha1.PodSelector{
-					Selector: v1alpha1.PodSelectorSpec{
-						GenericSelectorSpec: v1alpha1.GenericSelectorSpec{
-							LabelSelectors: map[string]string{
-								"app": "etcd-statefulset",
-							},
-						},
-						Nodes: []string{
-							"ip-10-250-72-179.eu-central-1.compute.internal",
-						},
-					},
-					Mode: v1alpha1.OneMode,
-				},
-			},
-			Action:     v1alpha1.IoLatency,
-			Delay:      "0ms",
-			Path:       "/var/etcd/data/**/*",
-			Percent:    0,
-			VolumePath: "/var/etcd/data",
-			Duration:   pointer.String("40h"),
-		},
+	codecs := serializer.NewCodecFactory(c.Scheme())
+	template, err := readIOChaosFromFile(codecs, templateFilePath)
+	if err != nil {
+		return nil, err
 	}
 
 	return &ChaosAgent{
@@ -93,6 +68,26 @@ func NewChaosAgent(kubeconfig string, templateFilePath string, interval, timeout
 		pollTimeoutInSeconds:  timeout,
 		ioChaosTemplate:       template,
 	}, nil
+}
+
+// readIOChaosFromFile reads a template file and instantiates a IOChaos object
+// from it using a codec factory.
+func readIOChaosFromFile(codecs serializer.CodecFactory, templateFilePath string) (*v1alpha1.IOChaos, error) {
+	templateData, err := ioutil.ReadFile(templateFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	templateObj, gvk, err := codecs.UniversalDecoder(v1alpha1.GroupVersion).Decode(templateData, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ioChaos, ok := templateObj.(*v1alpha1.IOChaos)
+	if !ok {
+		return nil, fmt.Errorf("got unexpected IOChaos group version kind: %v", gvk)
+	}
+	return ioChaos, nil
 }
 
 // NewIOChaos takes a delay and a percent and creates a new IOChaos CRO from

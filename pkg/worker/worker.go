@@ -6,6 +6,7 @@ import (
 
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
@@ -27,7 +28,15 @@ type Worker struct {
 
 // NewWorker initializes a new worker.
 func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	var (
+		config *rest.Config
+		err    error
+	)
+	if len(kubeconfig) == 0 {
+		config, err = rest.InClusterConfig()
+	} else {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	}
 	if err != nil {
 		return nil, err
 	}

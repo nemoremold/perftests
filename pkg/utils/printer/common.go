@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// TODO: use logger to provide a better way to also export.
 // PrintEmptyLine prints an empty line.
 func PrintEmptyLine() {
 	fmt.Println()
