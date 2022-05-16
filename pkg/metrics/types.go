@@ -11,12 +11,12 @@ var (
 	// SummaryObjectives defines the quantiles and their respective
 	// absolute error.
 	SummaryObjectives = map[float64]float64{
-		0.1:  0.05,
-		0.25: 0.05,
-		0.5:  0.025,
-		0.75: 0.025,
-		0.9:  0.01,
-		0.95: 0.005,
+		0.1:  0.001,
+		0.25: 0.001,
+		0.5:  0.001,
+		0.75: 0.001,
+		0.9:  0.001,
+		0.95: 0.001,
 		0.99: 0.001,
 	}
 
