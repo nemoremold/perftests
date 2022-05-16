@@ -111,8 +111,8 @@ func (w *Worker) testDeleteDeployments(ctx context.Context, set metrics.MetricSe
 			klog.Errorf("[worker %v] has failed to delete deployment %v: %v", w.ID, w.Deployment.Name, err.Error())
 		} else {
 			metrics.RecordAPIRequest(constants.DELETE, true, utils.GetDurationSince(startTime), set)
-			w.Deployment = nil
 			klog.V(4).Infof("[worker %v] has successfully deleted deployment %v", w.ID, w.Deployment.Name)
+			w.Deployment = nil
 		}
 	}
 }

@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	v1 "k8s.io/api/apps/v1"
@@ -57,8 +56,9 @@ func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
 func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, set metrics.MetricSetID) {
 	defer wg.Done()
 	defer func() {
-		recovered := recover()
-		klog.Error("[worker "+fmt.Sprint(w.ID)+"] stopping work due to panics:", recovered)
+		if err := recover(); err != nil {
+			klog.Errorf("[worker %v] stopping work due to panics: %v", w.ID, err)
+		}
 	}()
 
 	klog.V(4).Infof("[worker %v] has started", w.ID)
@@ -84,8 +84,9 @@ func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, 
 func (w *Worker) Cleanup(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer func() {
-		recovered := recover()
-		klog.Error("[worker "+fmt.Sprint(w.ID)+"] stopping cleanup due to panics:", recovered)
+		if err := recover(); err != nil {
+			klog.Errorf("[worker %v] stopping cleanup due to panics: %v", w.ID, err)
+		}
 	}()
 
 	klog.V(4).Infof("[worker %v] has started cleanup", w.ID)
