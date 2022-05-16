@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	v1 "k8s.io/api/apps/v1"
@@ -23,7 +24,7 @@ type Worker struct {
 	Client *kubernetes.Clientset
 
 	// Deployments is a list of deployments that the worker created.
-	Deployments []*v1.Deployment
+	Deployment *v1.Deployment
 }
 
 // NewWorker initializes a new worker.
@@ -55,28 +56,40 @@ func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
 // Run starts the performance testing workflow of a worker.
 func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, set metrics.MetricSetID) {
 	defer wg.Done()
+	defer func() {
+		recovered := recover()
+		klog.Error("[worker "+fmt.Sprint(w.ID)+"] stopping work due to panics:", recovered)
+	}()
 
-	klog.V(4).Infof("[worker %v] has started performance testing", w.ID)
-
-	w.Deployments = nil
-	w.testCreateDeployments(ctx, numberOfJobs, set)
-	w.testGetDeployments(ctx, set)
-	w.testUpdateDeployments(ctx, set)
-	w.testPatchDeployments(ctx, set)
-	w.testListDeployments(ctx, set)
-	w.testDeleteDeployments(ctx, set)
-
-	klog.V(4).Infof("[worker %v] performance testing done!", w.ID)
+	klog.V(4).Infof("[worker %v] has started", w.ID)
+	for jobID := 0; jobID < numberOfJobs || numberOfJobs == -1; jobID++ {
+		select {
+		case <-ctx.Done():
+			klog.V(4).Infof("[worker %v] stop signal received, stopping worker", w.ID)
+			break
+		default:
+			w.Deployment = nil
+			w.testCreateDeployments(ctx, set)
+			w.testGetDeployments(ctx, set)
+			w.testUpdateDeployments(ctx, set)
+			w.testPatchDeployments(ctx, set)
+			w.testListDeployments(ctx, set)
+			w.testDeleteDeployments(ctx, set)
+		}
+	}
+	klog.V(4).Infof("[worker %v] has stopped!", w.ID)
 }
 
 // Cleanup starts the clean up workflow of a worker.
 func (w *Worker) Cleanup(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
+	defer func() {
+		recovered := recover()
+		klog.Error("[worker "+fmt.Sprint(w.ID)+"] stopping cleanup due to panics:", recovered)
+	}()
 
 	klog.V(4).Infof("[worker %v] has started cleanup", w.ID)
-
 	w.cleanupDeployments(ctx)
 	w.cleanupPods(ctx)
-
 	klog.V(4).Infof("[worker %v] cleanup done!", w.ID)
 }

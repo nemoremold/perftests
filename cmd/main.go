@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -36,27 +39,34 @@ func parseFlags(opts *options.Options) {
 // TODO: enhance logging with customized logger.
 // TODO: enhance error handling (resource cleanup), including fixing context and recover from panic (for cleanup).
 func main() {
-	// Parse flags and read configurations
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
+	exitChan := make(chan os.Signal, 2)
+	defer close(exitChan)
+	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-exitChan
+		klog.Warningf("signal %v received, start gracefully shutting down", sig)
+		cancel()
+		sig = <-exitChan
+		klog.Warningf("signal %v received again, forcefully shutting down", sig)
+		os.Exit(1)
+	}()
+
 	opts := options.NewOptions()
 	parseFlags(opts)
 	if err := opts.Parse(); err != nil {
 		klog.Fatalf("failed to parse options: %v", err.Error())
 	}
 
-	// TODO: fix context.
-	// Prepare global context.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-	}()
-
-	// Initialize test flow.
 	flow, err := testflow.NewTestFlow(opts)
 	if err != nil {
 		klog.Fatalf("failed to create test flow: %v", err.Error())
 	}
 
-	// Run test flow.
 	if flow == nil {
 		klog.Fatal("failed to create test flow, empty flow returned")
 	} else {
