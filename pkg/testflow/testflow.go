@@ -69,17 +69,35 @@ func NewTestFlow(opts *options.Options) (*TestFlow, error) {
 // RunTestFlow iterates the pre-defined range of percents and latencies to be applied
 // to the IOChaos, and runs the test flow with every (latency, percent) pair setting.
 func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
+	testFlowContext, testFlowCancel := context.WithCancel(ctx)
+	// Use `context.Background` instead of `ctx` to be able to export current collected
+	// metrics to a report when stop signal is received and the test has stopped.
+	writerContext, writerCancel := context.WithCancel(context.Background())
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Errorf("recovered from error to safely terminate test flow: %v", err)
+		}
+		testFlowCancel()
+		writerCancel()
+	}()
+
 	klog.V(2).Info("starting test flow")
 	startTime := time.Now()
 	for percentIndex := range flow.Percents {
 		for latencyIndex := range flow.Latencies {
-			if err := flow.startTestFlowWithIOChaos(ctx, percentIndex, latencyIndex); err != nil {
-				return err
+			select {
+			case <-ctx.Done():
+				klog.V(2).Info("stop signal received, stopping test flow")
+				break
+			default:
+				if err := flow.startTestFlowWithIOChaos(testFlowContext, percentIndex, latencyIndex); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	endTime := time.Now()
-	klog.V(2).Info("successfully finished test flow")
+	klog.V(2).Info("finished test flow")
 	klog.V(2).Infof("test flow started at %v", startTime.Local())
 	klog.V(2).Infof("test flow finished at %v", endTime.Local())
 	klog.V(2).Infof("test flow duration: %v", endTime.Sub(startTime).String())
@@ -87,7 +105,7 @@ func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 	// Export the final report to a CSV file.
 	if flow.WriteToCSV {
 		// Export the report to a CSV file.
-		flow.Exporter.WriteToCSV(ctx, flow.Options, startTime)
+		flow.Exporter.WriteToCSV(writerContext, flow.Options, startTime)
 	}
 	return nil
 }
@@ -111,26 +129,28 @@ func (flow *TestFlow) startTestFlowWithIOChaos(ctx context.Context, percentIndex
 	// ALWAYS DO CLEANUP WITHOUT IOCHAOS! - RUN CLEANUP FIRST!
 	// Ensure the environment is clean before testing.
 	klog.V(4).Info("cleaning up testing environment before performance testing")
-	flow.cleanup(ctx, nil)
+	flow.cleanup(context.Background())
 
-	// TODO: current design of context and cancel channel is not correct, fix it!
 	// ALWAYS DO CLEANUP WITHOUT IOCHAOS! - DEFER CLEANUP FIRST!
 	// Prepare context dedicated for performance testing. When stop signal
 	// is received, this dedicated context will be cancelled first, triggering
-	// the clean up process before actually stopping the program.
+	// the clean up process before actually stopping the program. When stop
+	// signal is received a second time, the cleanup will be forcefully quited.
 	jobsCtx, jobsCancel := context.WithCancel(ctx)
-	// Clean up workflow leverages global context.
-	defer flow.cleanup(ctx, jobsCancel)
+	defer func() {
+		jobsCancel()
+		flow.cleanup(context.Background())
+	}()
 
 	// Ensure IOChaos is deleted after each test.
 	defer func() {
-		if deleteErr := flow.Agent.Delete(ctx, ioChaos); deleteErr != nil {
+		if deleteErr := flow.Agent.Delete(context.Background(), ioChaos); deleteErr != nil {
 			err = fmt.Errorf("%v: %w", deleteErr.Error(), err)
 		}
 	}()
 
 	// Create corresponding IOChaos before each test.
-	if err = flow.Agent.Create(ctx, ioChaos); err != nil {
+	if err = flow.Agent.Create(context.Background(), ioChaos); err != nil {
 		return
 	}
 
@@ -192,11 +212,7 @@ func (flow *TestFlow) performanceTest(ctx context.Context, set metrics.MetricSet
 }
 
 // cleanup tells all workers to run clean up workflow and waits for them to complete.
-func (flow *TestFlow) cleanup(ctx context.Context, cancel context.CancelFunc) {
-	if cancel != nil {
-		cancel()
-	}
-
+func (flow *TestFlow) cleanup(ctx context.Context) {
 	klog.V(4).Info("cleanup has started")
 
 	cleanupWaitGroup := &sync.WaitGroup{}

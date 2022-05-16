@@ -17,7 +17,6 @@ func (w *Worker) cleanupDeployments(ctx context.Context) {
 
 	var remainingDeployments []v1.Deployment
 
-	// TODO: fix context.
 	if err := retry.OnError(retry.DefaultRetry, func(_ error) bool {
 		select {
 		case <-ctx.Done():
@@ -71,7 +70,6 @@ func (w *Worker) cleanupPods(ctx context.Context) {
 
 	var remainingPods []v12.Pod
 
-	// TODO: fix context.
 	if err := retry.OnError(retry.DefaultRetry, func(_ error) bool {
 		select {
 		case <-ctx.Done():

@@ -55,6 +55,11 @@ func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
 // Run starts the performance testing workflow of a worker.
 func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, set metrics.MetricSetID) {
 	defer wg.Done()
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Errorf("[worker %v] has stopped performance testing due to error: %v", err)
+		}
+	}()
 
 	klog.V(4).Infof("[worker %v] has started performance testing", w.ID)
 
@@ -72,6 +77,11 @@ func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, 
 // Cleanup starts the clean up workflow of a worker.
 func (w *Worker) Cleanup(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Errorf("[worker %v] has stopped cleanup due to error: %v", err)
+		}
+	}()
 
 	klog.V(4).Infof("[worker %v] has started cleanup", w.ID)
 

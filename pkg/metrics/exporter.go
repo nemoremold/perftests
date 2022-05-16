@@ -112,7 +112,6 @@ func (e *Exporter) Export(ctx context.Context, filepath string) error {
 	}
 	defer file.Close()
 
-	// TODO: is this the proper way?
 	go func() {
 		<-ctx.Done()
 		_ = file.Close()
