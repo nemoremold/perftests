@@ -62,10 +62,11 @@ func (w *Worker) Run(ctx context.Context, numberOfJobs int, wg *sync.WaitGroup, 
 	}()
 
 	klog.V(4).Infof("[worker %v] has started", w.ID)
-	for jobID := 0; jobID < numberOfJobs || numberOfJobs == -1; jobID++ {
+	for jobID, loop := 0, true; loop && (jobID < numberOfJobs || numberOfJobs == -1); jobID++ {
 		select {
 		case <-ctx.Done():
 			klog.V(4).Infof("[worker %v] stop signal received, stopping worker", w.ID)
+			loop = false
 			break
 		default:
 			w.Deployment = nil
