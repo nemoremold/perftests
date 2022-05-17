@@ -83,17 +83,25 @@ func (flow *TestFlow) RunTestFlow(ctx context.Context) error {
 
 	klog.V(2).Info("starting test flow")
 	startTime := time.Now()
+	cancelled := false
 	for percentIndex := range flow.Percents {
 		for latencyIndex := range flow.Latencies {
 			select {
 			case <-ctx.Done():
 				klog.V(2).Info("stop signal received, stopping test flow")
+				cancelled = true
 				break
 			default:
 				if err := flow.startTestFlowWithIOChaos(testFlowContext, percentIndex, latencyIndex); err != nil {
 					return err
 				}
 			}
+			if cancelled {
+				break
+			}
+		}
+		if cancelled {
+			break
 		}
 	}
 	endTime := time.Now()
