@@ -8,6 +8,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 
 	"github.com/nemoremold/perftests/pkg/metrics"
@@ -40,6 +41,8 @@ func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 50)
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
