@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"k8s.io/client-go/util/flowcontrol"
 	"sync"
 
 	v1 "k8s.io/api/apps/v1"
@@ -40,6 +41,8 @@ func NewWorker(workerId int, kubeconfig string) (*Worker, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 50)
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
