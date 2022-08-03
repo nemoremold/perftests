@@ -35,7 +35,7 @@ func main() {
 			if err == nil {
 				break
 			} else {
-				klog.Errorf("Failed to write put-%v", i)
+				klog.Errorf("Failed to put put-%v", i)
 			}
 		}
 	}
@@ -47,12 +47,11 @@ func main() {
 
 	for i := 0; i < testCount; i++ {
 		for {
-			resp, err := c.Delete(context.Background(), fmt.Sprintf("put-%v", i))
-			klog.Info(resp)
+			_, err := c.Delete(context.Background(), fmt.Sprintf("put-%v", i))
 			if err == nil {
 				break
 			} else {
-				klog.Errorf("Failed to write put-%v", i)
+				klog.Errorf("Failed to delete put-%v", i)
 			}
 		}
 	}
