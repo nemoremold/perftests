@@ -18,6 +18,7 @@ func main() {
 
 	pflag.StringArrayVarP(&endpoints, "endpoints", "e", nil, "etcd endpoints")
 	pflag.IntVarP(&testCount, "test-count", "c", 100, "number of tests")
+	pflag.Parse()
 
 	c, err := clientv3.New(clientv3.Config{
 		Endpoints: endpoints,
