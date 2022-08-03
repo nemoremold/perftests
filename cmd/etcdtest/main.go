@@ -31,13 +31,12 @@ func main() {
 	for i := 0; i < testCount; i++ {
 		for {
 			resp, err := c.Put(context.Background(), fmt.Sprintf("put-%v", i), fmt.Sprintf("%v-%v", i, time.Now().UnixMilli()))
+			klog.Info(resp)
 			if err == nil {
 				break
 			} else {
 				klog.Errorf("Failed to write put-%v", i)
 			}
-
-			klog.Info(resp)
 		}
 	}
 	duration := time.Since(startTime)
@@ -45,4 +44,16 @@ func main() {
 
 	klog.Infof("Test duration:   %v", duration)
 	klog.Infof("Puts per second: %v", putsPerSecond)
+
+	for i := 0; i < testCount; i++ {
+		for {
+			resp, err := c.Delete(context.Background(), fmt.Sprintf("put-%v", i))
+			klog.Info(resp)
+			if err == nil {
+				break
+			} else {
+				klog.Errorf("Failed to write put-%v", i)
+			}
+		}
+	}
 }
