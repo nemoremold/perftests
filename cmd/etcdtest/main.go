@@ -40,8 +40,8 @@ func main() {
 			klog.Info(resp)
 		}
 	}
-	duration := time.Since(startTime).Minutes()
-	putsPerSecond := float64(testCount) / duration
+	duration := time.Since(startTime)
+	putsPerSecond := float64(testCount) / duration.Seconds()
 
 	klog.Infof("Test duration:   %v", duration)
 	klog.Infof("Puts per second: %v", putsPerSecond)
