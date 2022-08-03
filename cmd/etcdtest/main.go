@@ -30,9 +30,9 @@ func main() {
 	startTime := time.Now()
 	for i := 0; i < testCount; i++ {
 		for {
-			resp, err := c.Put(context.Background(), fmt.Sprintf("put-%v", i), fmt.Sprintf("%v-%v", i, time.Now().UnixMilli()))
-			klog.Info(resp)
+			_, err := c.Put(context.Background(), fmt.Sprintf("put-%v", i), fmt.Sprintf("%v-%v", i, time.Now().UnixMilli()))
 			if err == nil {
+				klog.Infof("%.2f%% (%v/%v) done.", float64(i)/float64(testCount), i, testCount)
 				break
 			} else {
 				klog.Errorf("Failed to put put-%v", i)
