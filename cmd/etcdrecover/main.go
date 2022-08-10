@@ -238,26 +238,46 @@ func operateEtcdWatcher(ctx context.Context, connectionID string) {
 	defer w.Close()
 	klog.Infof("starting watcher %v to watch connection %v", connectionID, connectionID)
 	wChan := w.Watch(ctx, fmt.Sprintf("conn-%v", connectionID))
+	w2 := clientv3.NewWatcher(c)
+	defer w2.Close()
+	klog.Infof("starting watcher2 %v to watch connection %v with prefix", connectionID, connectionID)
+	wChan2 := w.Watch(ctx, fmt.Sprintf("conn-%v", connectionID), clientv3.WithPrefix())
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				klog.Infof("watcher: %v, connection state: %v, connection target: %v", connectionID, c.ActiveConnection().GetState().String(), c.ActiveConnection().Target())
+				klog.Infof("watchers: %v, connection state: %v, connection target: %v", connectionID, c.ActiveConnection().GetState().String(), c.ActiveConnection().Target())
 				time.Sleep(time.Second)
 			}
 		}
 	}()
-	for {
-		select {
-		case <-ctx.Done():
-			klog.Infof("shutting down watcher %v", connectionID)
-			return
-		case change := <-wChan:
-			for _, event := range change.Events {
-				klog.Infof("watcher: %v, watched %v changed to %v", connectionID, string(event.Kv.Key), string(event.Kv.Value))
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				klog.Infof("shutting down watcher %v", connectionID)
+				return
+			case change := <-wChan:
+				for _, event := range change.Events {
+					klog.Infof("watcher: %v, watched %v changed to %v", connectionID, string(event.Kv.Key), string(event.Kv.Value))
+				}
 			}
 		}
-	}
+	}()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				klog.Infof("shutting down watcher2 %v", connectionID)
+				return
+			case change := <-wChan2:
+				for _, event := range change.Events {
+					klog.Infof("watcher2: %v, watched %v changed to %v", connectionID, string(event.Kv.Key), string(event.Kv.Value))
+				}
+			}
+		}
+	}()
+	<-ctx.Done()
 }
